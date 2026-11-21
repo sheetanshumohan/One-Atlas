@@ -3,9 +3,18 @@
 An MVP of [oneatlas.dev](https://oneatlas.dev/) for the AI Software Engineer Internship assignment (**Backend Engineer**
 role). It helps developers discover, compare and evaluate AI models across labs and providers.
 
+## Live demo
+
+| | |
+|---|---|
+| **Website** (Vercel) | **https://oneatlas-one.vercel.app** |
+| **API** (Render) | https://oneatlas-api.onrender.com · interactive docs: https://oneatlas-api.onrender.com/docs |
+
+The API runs on Render's free plan, which sleeps when idle: the first request after a pause can take about 50s.
+
 | Part | Stack | Docs |
 |---|---|---|
-| [`oneatlas-api/`](oneatlas-api/README.md) | Node.js · TypeScript · NestJS · PostgreSQL · Prisma | REST API, data model, ingestion, ~454 tests |
+| [`oneatlas-api/`](oneatlas-api/README.md) | Node.js · TypeScript · NestJS · PostgreSQL · Prisma | REST API, data model, ingestion, 455 tests |
 | [`oneatlas-web/`](oneatlas-web/README.md) | Next.js · React · TypeScript · Tailwind CSS | Product UI, 89 tests (unit + Playwright) |
 
 ## Assignment requirements → where they are

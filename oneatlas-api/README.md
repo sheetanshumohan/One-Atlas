@@ -11,7 +11,7 @@ pricing, capabilities, benchmarks, rankings, global search and data ingestion.
 | Interactive API docs (Swagger UI) | `GET /docs` |
 | OpenAPI 3 spec | `GET /docs-json` |
 | Base path | `/api/v1` |
-| Tests | **454 tests** (181 unit + 273 e2e against a real PostgreSQL), ~97% line coverage |
+| Tests | **455 tests** (181 unit + 274 e2e against a real PostgreSQL), ~97% line coverage |
 | Web app | [`../oneatlas-web`](../oneatlas-web/README.md): the Next.js + Tailwind product UI built on this API |
 
 ---
@@ -183,7 +183,7 @@ createdb oneatlas_test          # .env.test points at it; or export DATABASE_URL
 
 npm test                        # unit + e2e
 npm run test:unit               # 181 pure-logic tests (no DB)
-npm run test:e2e                # 273 HTTP tests against real PostgreSQL (migrations applied automatically)
+npm run test:e2e                # 274 HTTP tests against real PostgreSQL (migrations applied automatically)
 npm run test:cov                # coverage report
 ```
 
