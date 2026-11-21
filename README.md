@@ -42,7 +42,7 @@ backend is the focus, but the full product (backend, database, frontend, deploym
 | Feature | Where | What it does |
 |---|---|---|
 | **Explore models** | [`/models`](https://oneatlas-one.vercel.app/models) | Search, filter by company, provider, capability, type, modality, open weights, context size and price. Sort by price, context, release date and more. |
-| **Model details** | e.g. [`/models/gpt-4o`](https://oneatlas-one.vercel.app/models/gpt-4o) | Specs, the price on **every provider** (cheapest highlighted), capabilities and benchmark scores. |
+| **Model details** | e.g. [`/models/gpt-4o`](https://oneatlas-one.vercel.app/models/gpt-4o) | Specs, the price on **every provider** (cheapest highlighted), **price history**, capabilities and benchmark scores. |
 | **Compare** | [`/compare`](https://oneatlas-one.vercel.app/compare?models=gpt-4o,claude-3.5-sonnet,deepseek-r1) | Up to 6 models side by side; the best value in each row is marked ★. Add models from anywhere with "+ Compare". |
 | **Leaderboards** | [`/rankings`](https://oneatlas-one.vercel.app/rankings) | Rank models overall, by category (coding, math…) or by a single benchmark. |
 | **AI labs** | [`/labs`](https://oneatlas-one.vercel.app/labs) | Every company, with its models on a release timeline. |
@@ -160,16 +160,16 @@ API_URL=http://localhost:3000 npm start      # website on :3001
 
 ## Testing
 
-The project has **540+ automated tests**. They all run on every push to GitHub (CI), and a separate check runs the
+The project has **580+ automated tests**. They all run on every push to GitHub (CI), and a separate check runs the
 browser tests against the **live** website.
 
 | Suite | Count | What it proves |
 |---|---|---|
-| API unit tests | 181 | The logic is correct on its own: price conversion, ranking maths, search safety, validation rules… |
-| API end-to-end tests | 274 | Every endpoint works against a **real PostgreSQL**: filters, sorting, pagination, errors, security, data consistency under concurrent writes. |
+| API unit tests | 197 | The logic is correct on its own: price conversion, ranking maths, search safety, validation rules… |
+| API end-to-end tests | 288 | Every endpoint works against a **real PostgreSQL**: filters, sorting, pagination, errors, security, price history, `/meta` facets matching real filter results, data consistency under concurrent writes. |
 | Web unit tests | 31 | Formatting and URL-state helpers. |
-| Browser tests | 58 | A real browser (desktop **and** phone sizes) uses the site: search, filters, compare, rankings, 404s, works without JavaScript, no console errors, no layout overflow. |
-| Live check | ~460 API checks + the 58 browser tests | Runs against the deployed site from GitHub Actions. |
+| Browser tests | 72 | A real browser (desktop **and** phone sizes) uses the site: search, filters, compare, rankings, 404s, works without JavaScript, no console errors, no layout overflow, and **every option and count on screen matches the API** (proves nothing is hard-coded). |
+| Live check | ~650 API checks + the 72 browser tests | Runs against the deployed site from GitHub Actions. |
 
 ```bash
 cd oneatlas-api && npm test        # needs a PostgreSQL test database (see oneatlas-api/README.md)
@@ -217,6 +217,11 @@ the website, and set the website's `API_URL` to the API's URL.
 Short version below; the full reasoning is in [`oneatlas-api/README.md`](oneatlas-api/README.md) and
 [`oneatlas-web/README.md`](oneatlas-web/README.md).
 
+- **All data is managed by the database and API; the frontend hard-codes nothing.** `GET /api/v1/meta` serves
+  every filter option (with live counts), label, sort option and limit straight from the database. Browser tests
+  check that the screen matches the API exactly.
+- **Price history is an append-only audit log** written in the same transaction as every price change (API,
+  ingestion, seed), so history can never disagree with current prices.
 - **Prices live on the provider offering**, not on the model. A "cheapest price" summary on each model makes sorting
   fast. It's updated in the same database transaction as any price change, with row locking, so it can never go
   stale, even under simultaneous updates (a test proves this).

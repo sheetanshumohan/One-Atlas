@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { auth, createTestApp, TestApp } from './helpers/app';
-import { pricingInconsistencies, seedFixtures } from './helpers/fixtures';
+import { priceHistoryInconsistencies, pricingInconsistencies, seedFixtures } from './helpers/fixtures';
 
 const newModel = (over: Record<string, unknown> = {}) => ({
   name: 'New Model 2.0',
@@ -29,6 +29,7 @@ describe('Models — write API, pricing & benchmark data management (e2e)', () =
   afterEach(async () => {
     // Data-consistency invariant must hold after EVERY test in this suite.
     expect(await pricingInconsistencies(t.prisma)).toEqual([]);
+    expect(await priceHistoryInconsistencies(t.prisma)).toEqual([]);
   });
   afterAll(() => t.close());
 

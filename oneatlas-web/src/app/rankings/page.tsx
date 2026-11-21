@@ -3,9 +3,10 @@ import Link from 'next/link';
 import { RankingsControls } from '@/components/rankings-controls';
 import { Avatar, Badge, EmptyState, PageHeader, Pagination, ScoreBar } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
-import { CATEGORY_LABEL, formatScore, MODEL_TYPE_LABEL } from '@/lib/format';
+import { formatScore } from '@/lib/format';
+import { getLabels, getMeta } from '@/lib/meta';
 import { readPage, readString, withParams, type SearchParams } from '@/lib/query';
-import type { BenchmarkCategory, LeaderboardEntry, ModelType } from '@/lib/types';
+import type { LeaderboardEntry } from '@/lib/types';
 
 export const metadata: Metadata = { title: 'Rankings & leaderboards' };
 
@@ -50,8 +51,9 @@ function Podium({ entries }: { entries: LeaderboardEntry[] }) {
 
 export default async function RankingsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
-  const benchmarksList = await api.benchmarks({ pageSize: 100 });
-  const usedCategories = [...new Set(benchmarksList.data.filter((b) => b.resultCount > 0).map((b) => b.category))];
+  // Scope options (categories, benchmarks), type filter and every label come from the API.
+  const [meta, labels, benchmarks] = await Promise.all([getMeta(), getLabels(), api.allBenchmarks()]);
+  const rankedBenchmarks = benchmarks.filter((b) => b.resultCount > 0);
 
   let content: React.ReactNode;
   let heading = 'Overall leaderboard';
@@ -66,7 +68,7 @@ export default async function RankingsPage({ searchParams }: { searchParams: Pro
       pageSize: 25,
     });
     const single = board.scope.kind === 'benchmark' ? board.scope.benchmarks[0] : null;
-    heading = single ? `${single.name} leaderboard` : board.scope.category ? `${CATEGORY_LABEL[board.scope.category]} leaderboard` : heading;
+    heading = single ? `${single.name} leaderboard` : board.scope.category ? `${labels.benchmarkCategory[board.scope.category]} leaderboard` : heading;
     content =
       board.data.length === 0 ? (
         <EmptyState title="No ranked models for this selection" />
@@ -103,7 +105,7 @@ export default async function RankingsPage({ searchParams }: { searchParams: Pro
                         </div>
                       </div>
                     </td>
-                    <td className="td hidden text-sm text-slate-400 md:table-cell">{e.model.type ? MODEL_TYPE_LABEL[e.model.type as ModelType] : '—'}</td>
+                    <td className="td hidden text-sm text-slate-400 md:table-cell">{e.model.type ? labels.modelType[e.model.type] : '—'}</td>
                     {single && <td className="td text-right tabular-nums text-white">{formatScore(e.results[single.slug].score, single.unit)}</td>}
                     <td className="td">
                       <ScoreBar value={e.score} best={e.rank === 1} />
@@ -139,9 +141,9 @@ export default async function RankingsPage({ searchParams }: { searchParams: Pro
         description="Rank models by a single benchmark, a benchmark category, or across everything. Scores from different scales (%, Elo, error rates) are normalised to 0–100."
       />
       <RankingsControls
-        categories={usedCategories.map((c) => ({ value: c, label: CATEGORY_LABEL[c as BenchmarkCategory] }))}
-        benchmarks={benchmarksList.data.filter((b) => b.resultCount > 0).map((b) => ({ slug: b.slug, name: b.name, category: b.category }))}
-        types={(['CHAT', 'REASONING', 'CODE'] as ModelType[]).map((t) => ({ value: t, label: MODEL_TYPE_LABEL[t] }))}
+        categories={meta.facets.benchmarkCategories.map((c) => ({ value: c.value, label: c.label }))}
+        benchmarks={rankedBenchmarks.map((b) => ({ slug: b.slug, name: b.name, category: b.category }))}
+        types={meta.facets.modelTypes.map((t) => ({ value: t.value, label: t.label }))}
       />
       <div className="mt-6">{content}</div>
     </>

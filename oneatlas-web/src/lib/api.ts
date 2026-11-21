@@ -1,7 +1,7 @@
 import 'server-only';
 import type {
   Benchmark, Capability, Comparison, Leaderboard, ModelDetail, ModelSummary, Organization, OrganizationDetail,
-  Paginated, Provider, ProviderDetail, SearchResults, Stats, ApiErrorBody,
+  Meta, Paginated, PriceHistoryEntry, Provider, ProviderDetail, SearchResults, Stats, ApiErrorBody,
 } from './types';
 
 /**
@@ -64,6 +64,19 @@ async function orNull<T>(p: Promise<T>): Promise<T | null> {
   }
 }
 
+/**
+ * Follows pagination until every row is loaded (bounded by the API's max page size per request), so lists
+ * such as directories and pickers are never silently truncated as the catalogue grows.
+ */
+async function fetchAll<T>(path: string, params: Query = {}): Promise<T[]> {
+  const out: T[] = [];
+  for (let page = 1; ; page++) {
+    const res = await request<Paginated<T>>(path, { ...params, page, pageSize: 100 });
+    out.push(...res.data);
+    if (!res.meta.hasNextPage) return out;
+  }
+}
+
 export const api = {
   models: (params: Query) => request<Paginated<ModelSummary>>('/models', params),
   model: (slug: string) => orNull(request<ModelDetail>(`/models/${encodeURIComponent(slug)}`)),
@@ -77,4 +90,10 @@ export const api = {
   rankings: (params: Query) => request<Leaderboard>('/rankings', params),
   search: (q: string, limit = 8) => request<SearchResults>('/search', { q, limit }),
   stats: () => request<Stats>('/stats'),
+  meta: () => request<Meta>('/meta'),
+  priceHistory: (slug: string, params: Query = {}) => request<Paginated<PriceHistoryEntry>>(`/models/${encodeURIComponent(slug)}/price-history`, params),
+  allModels: (params: Query = {}) => fetchAll<ModelSummary>('/models', params),
+  allOrganizations: (params: Query = {}) => fetchAll<Organization>('/organizations', params),
+  allProviders: (params: Query = {}) => fetchAll<Provider>('/providers', params),
+  allBenchmarks: (params: Query = {}) => fetchAll<Benchmark>('/benchmarks', params),
 };

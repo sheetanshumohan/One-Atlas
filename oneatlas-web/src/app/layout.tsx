@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { CompareProvider } from '@/components/compare-context';
 import { CompareTray } from '@/components/compare-tray';
 import { Header } from '@/components/header';
+import { getMeta } from '@/lib/meta';
 import './globals.css';
 
 // Render on request (data comes from the API, which may not be reachable at build time); API responses are cached for 60s.
@@ -24,7 +25,10 @@ const FOOTER_LINKS = [
   { href: '/providers', label: 'Providers' },
 ];
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Compare limit from the API. If the API is unreachable the page itself shows the error state;
+  // the layout stays up (no cap client-side; the API still enforces it).
+  const compareMax = await getMeta().then((m) => m.limits.compare.max, () => undefined);
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="flex min-h-screen flex-col font-sans">
@@ -37,7 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="glow absolute -bottom-48 left-1/4 h-[40rem] w-[40rem] animate-float [--glow:rgba(6,182,212,0.12)]" />
         </div>
 
-        <CompareProvider>
+        <CompareProvider max={compareMax}>
           <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:text-ink-950">
             Skip to content
           </a>

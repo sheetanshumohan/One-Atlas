@@ -13,7 +13,7 @@ import { PrismaClient } from '@prisma/client';
  */
 export async function resetDb(prisma: PrismaClient): Promise<void> {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "BenchmarkResult", "ModelProvider", "ModelCapability", "Model", "Benchmark", "Capability", "Provider", "Organization" RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE "PriceHistory", "BenchmarkResult", "ModelProvider", "ModelCapability", "Model", "Benchmark", "Capability", "Provider", "Organization" RESTART IDENTITY CASCADE',
   );
 }
 
@@ -103,6 +103,30 @@ export async function seedFixtures(prisma: PrismaClient): Promise<void> {
           FROM "Model" m2 LEFT JOIN "ModelProvider" mp ON mp."modelId" = m2.id AND mp."isAvailable"
           GROUP BY m2.id) agg
     WHERE m.id = agg.id`;
+
+  // One "CREATED" history event per fixture offering, dated in the past (mirrors the migration backfill).
+  await prisma.$executeRaw`
+    INSERT INTO "PriceHistory" ("id", "modelId", "providerId", "change", "inputPricePerMTok", "outputPricePerMTok", "cachedInputPerMTok", "isAvailable", "source", "recordedAt")
+    SELECT 'fx_' || mp.id, mp."modelId", mp."providerId", 'CREATED', mp."inputPricePerMTok", mp."outputPricePerMTok", mp."cachedInputPerMTok", mp."isAvailable", 'fixture', TIMESTAMP '2024-01-01'
+    FROM "ModelProvider" mp`;
+}
+
+/**
+ * Invariant check for the price history log: every current offering's LATEST history event must exist,
+ * not be a removal, and match its current prices/availability. Returns violating "model@provider" (expected: []).
+ */
+export async function priceHistoryInconsistencies(prisma: PrismaClient): Promise<string[]> {
+  const rows = await prisma.$queryRaw<{ offering: string }[]>`
+    SELECT m.slug || '@' || p.slug AS offering
+    FROM "ModelProvider" mp JOIN "Model" m ON m.id = mp."modelId" JOIN "Provider" p ON p.id = mp."providerId"
+    LEFT JOIN LATERAL (
+      SELECT * FROM "PriceHistory" h WHERE h."modelId" = mp."modelId" AND h."providerId" = mp."providerId"
+      ORDER BY h."recordedAt" DESC, h.id DESC LIMIT 1) h ON TRUE
+    WHERE h.id IS NULL OR h.change = 'REMOVED'
+       OR h."inputPricePerMTok" <> mp."inputPricePerMTok" OR h."outputPricePerMTok" <> mp."outputPricePerMTok"
+       OR h."cachedInputPerMTok" IS DISTINCT FROM mp."cachedInputPerMTok" OR h."isAvailable" <> mp."isAvailable"
+    ORDER BY 1`;
+  return rows.map((r) => r.offering);
 }
 
 /**

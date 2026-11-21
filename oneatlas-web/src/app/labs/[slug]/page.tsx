@@ -4,7 +4,8 @@ import { notFound } from 'next/navigation';
 import { ModelList } from '@/components/model-list';
 import { Avatar, Badge, EmptyState, Stat } from '@/components/ui';
 import { api } from '@/lib/api';
-import { formatDate, ORG_TYPE_LABEL } from '@/lib/format';
+import { formatDate } from '@/lib/format';
+import { getLabels } from '@/lib/meta';
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -14,7 +15,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function LabPage({ params }: Props) {
-  const o = await api.organization((await params).slug);
+  const [o, labels] = await Promise.all([api.organization((await params).slug), getLabels()]);
   if (!o) notFound();
 
   // Group the (newest-first) models by release year for a timeline view.
@@ -40,7 +41,7 @@ export default async function LabPage({ params }: Props) {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-3xl font-semibold sm:text-4xl">{o.name}</h1>
-              <Badge>{ORG_TYPE_LABEL[o.type]}</Badge>
+              <Badge>{labels.organizationType[o.type]}</Badge>
             </div>
             {o.description && <p className="mt-3 max-w-3xl leading-relaxed text-slate-300">{o.description}</p>}
             <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-500">

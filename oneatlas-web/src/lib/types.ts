@@ -189,3 +189,58 @@ export interface ApiErrorBody {
   error: { code: string; message: string; details?: { field: string; messages: string[] }[] };
   requestId?: string;
 }
+
+export interface Option<T extends string = string> {
+  value: T;
+  label: string;
+}
+export interface CountedOption<T extends string = string> extends Option<T> {
+  count: number;
+}
+export interface CountedEntity {
+  slug: string;
+  name: string;
+  count: number;
+}
+
+/** GET /meta — the API's single source of truth for labels, filter options (with live counts), sorts and limits. */
+export interface Meta {
+  enums: {
+    modelTypes: Option<ModelType>[];
+    modelStatuses: Option<ModelStatus>[];
+    modalities: Option<Modality>[];
+    benchmarkCategories: Option<BenchmarkCategory>[];
+    organizationTypes: Option<OrganizationType>[];
+    priceChanges: Option<PriceChange>[];
+  };
+  facets: {
+    totalModels: number;
+    modelTypes: CountedOption<ModelType>[];
+    statuses: CountedOption<ModelStatus>[];
+    inputModalities: CountedOption<Modality>[];
+    outputModalities: CountedOption<Modality>[];
+    organizations: CountedEntity[];
+    providers: CountedEntity[];
+    capabilities: CountedEntity[];
+    benchmarkCategories: { value: BenchmarkCategory; label: string; benchmarks: number; results: number }[];
+    contextWindows: { min: number; label: string; count: number }[];
+    inputPrice: { min: number | null; max: number | null };
+    openWeights: number;
+  };
+  sorts: { value: string; label: string; defaultOrder: 'asc' | 'desc' }[];
+  sortPresets: { sort: string; order: 'asc' | 'desc'; label: string }[];
+  limits: { maxPageSize: number; compare: { min: number; max: number } };
+}
+
+export type PriceChange = 'CREATED' | 'UPDATED' | 'REMOVED';
+
+export interface PriceHistoryEntry {
+  provider: { slug: string; name: string };
+  change: PriceChange;
+  inputPricePerMTok: number;
+  outputPricePerMTok: number;
+  cachedInputPerMTok: number | null;
+  isAvailable: boolean;
+  source: string;
+  recordedAt: string;
+}

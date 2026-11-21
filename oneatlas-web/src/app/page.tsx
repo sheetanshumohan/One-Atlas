@@ -4,29 +4,45 @@ import { SearchBox } from '@/components/search-box';
 import { Avatar, Badge, ScoreBar, SectionHeading, Stat, TypeBadge } from '@/components/ui';
 import { api } from '@/lib/api';
 import { formatDate, formatPrice, formatTokens } from '@/lib/format';
+import { getMeta } from '@/lib/meta';
+import type { Meta } from '@/lib/types';
 
-const FEATURES = [
-  { href: '/models', icon: '⌕', title: 'Discover', text: 'Search and filter every model by lab, provider, capability, modality, context and price.' },
-  { href: '/compare', icon: '⇄', title: 'Compare', text: 'Put up to six models side by side, with the best value in each row highlighted.' },
-  { href: '/rankings', icon: '▲', title: 'Rank', text: 'Leaderboards by benchmark or category, with scores normalised to 0–100.' },
-  { href: '/labs', icon: '◎', title: 'Explore', text: 'Browse AI labs and inference providers, their releases and their pricing.' },
-];
+const byCount = <T extends { count: number }>(xs: T[]) => [...xs].sort((a, b) => b.count - a.count);
 
-const QUICK = [
-  { href: '/models?capability=tool-calling,vision&sort=inputPrice', label: 'Cheapest vision + tools' },
-  { href: '/models?openWeights=true', label: 'Open-weights models' },
-  { href: '/models?minContext=1000000', label: '1M+ context' },
-  { href: '/rankings?category=CODING', label: 'Best at coding' },
-];
+/**
+ * Quick links are derived from GET /meta facets (live data), never hard-coded slugs: each link only
+ * exists if the data behind it exists, and it follows the catalogue as it changes.
+ */
+function quickLinks(f: Meta['facets']) {
+  const links: { href: string; label: string }[] = [];
+  const caps = byCount(f.capabilities).slice(0, 2);
+  if (caps.length === 2) links.push({ href: `/models?capability=${caps.map((c) => c.slug).join(',')}&sort=inputPrice&order=asc`, label: `Cheapest with ${caps.map((c) => c.name.toLowerCase()).join(' + ')}` });
+  if (f.openWeights > 0) links.push({ href: '/models?openWeights=true', label: `Open-weights models (${f.openWeights})` });
+  const ctx = f.contextWindows[f.contextWindows.length - 1];
+  if (ctx) links.push({ href: `/models?minContext=${ctx.min}&sort=contextWindow`, label: `${ctx.label} context (${ctx.count})` });
+  const cat = [...f.benchmarkCategories].sort((a, b) => b.results - a.results)[0];
+  if (cat) links.push({ href: `/rankings?category=${cat.value}`, label: `Best at ${cat.label.toLowerCase()}` });
+  return links;
+}
 
 export default async function HomePage() {
+  const meta = await getMeta();
+  // The most common model type in the catalogue drives the "most affordable" list (data-driven, not a fixed type).
+  const mainType = byCount(meta.facets.modelTypes)[0];
   const [stats, newest, cheapest, top, labs] = await Promise.all([
     api.stats(),
-    api.models({ sort: 'releaseDate', pageSize: 6, status: 'PREVIEW,ACTIVE' }),
-    api.models({ sort: 'inputPrice', pageSize: 5, type: 'CHAT,REASONING', status: 'ACTIVE' }),
+    api.models({ sort: 'releaseDate', pageSize: 6 }),
+    api.models({ sort: 'inputPrice', pageSize: 5, type: mainType?.value }),
     api.rankings({ pageSize: 5, minBenchmarks: 3 }),
     api.organizations({ sort: 'modelCount', pageSize: 8 }),
   ]);
+  const QUICK = quickLinks(meta.facets);
+  const FEATURES = [
+    { href: '/models', icon: '⌕', title: 'Discover', text: 'Search and filter every model by lab, provider, capability, modality, context and price.' },
+    { href: '/compare', icon: '⇄', title: 'Compare', text: `Put up to ${meta.limits.compare.max} models side by side, with the best value in each row highlighted.` },
+    { href: '/rankings', icon: '▲', title: 'Rank', text: 'Leaderboards by benchmark or category, with scores normalised to 0–100.' },
+    { href: '/labs', icon: '◎', title: 'Explore', text: 'Browse AI labs and inference providers, their releases and their pricing.' },
+  ];
 
   return (
     <div className="space-y-20">
@@ -154,7 +170,11 @@ export default async function HomePage() {
           </ol>
         </section>
         <section className="card p-6">
-          <SectionHeading title="Most affordable chat models" href="/models?sort=inputPrice&type=CHAT,REASONING" linkLabel="More →" />
+          <SectionHeading
+            title={mainType ? `Most affordable ${mainType.label.toLowerCase()} models` : 'Most affordable models'}
+            href={`/models?sort=inputPrice&order=asc${mainType ? `&type=${mainType.value}` : ''}`}
+            linkLabel="More →"
+          />
           <ol className="space-y-3">
             {cheapest.data.map((m) => (
               <li key={m.slug} className="flex items-center gap-3 text-sm">

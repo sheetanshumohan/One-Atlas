@@ -58,7 +58,7 @@ test.describe('Model detail, comparison, rankings, directories', () => {
 
   test('compare handles empty and invalid selections', async ({ page }) => {
     await page.goto('/compare');
-    await expect(page.getByTestId('empty-state')).toContainText('Pick at least two models');
+    await expect(page.getByTestId('empty-state')).toContainText(/Pick at least \d+ models/);
     await page.goto('/compare?models=gpt-4o,ghost-model');
     await expect(page.getByTestId('empty-state')).toContainText("Couldn't compare");
   });

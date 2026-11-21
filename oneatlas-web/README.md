@@ -33,6 +33,30 @@ A dark, modern interface: glass cards, gradient accents, the Geist typeface, and
 - **Layout:** the model table switches to cards on smaller screens. Long names wrap instead of widening the table, and
   low-priority columns hide on narrow screens. Checked by measuring overflow at 768 / 1024 / 1280 / 1440 / 1920 px.
 
+## Data comes only from the database, through the API
+
+The web app holds **no catalogue data of its own**: no lists of model types, labs, providers, capabilities,
+modalities, context sizes, sort options, labels or limits.
+
+| What you see | Where it comes from |
+|---|---|
+| Models, labs, providers, prices, benchmarks, rankings, price history | The resource endpoints (`/models`, `/organizations`, `/providers`, `/rankings`, `/models/:slug/price-history`…) |
+| Every filter option and its count, context-size buckets, price range | `GET /meta` → `facets` (computed from the database; options with no models don't appear) |
+| Every label ("Chat", "General knowledge", "Big tech", "Price changed"…) | `GET /meta` → `enums` |
+| Sort menu choices and their default directions | `GET /meta` → `sortPresets`, `sorts` |
+| Compare limit (max/min models) | `GET /meta` → `limits` |
+| Home-page quick links, "most affordable" list, compare example | Derived at request time from `/meta` facets and the live leaderboard |
+
+`getMeta()` (`src/lib/meta.ts`) fetches `/meta` once per request and caches it for 60s. Directory pages and the
+compare picker follow pagination to the end, so nothing is cut off at a page-size limit.
+
+The browser suite **enforces** this rule. `e2e/data-driven.spec.ts` reads `/meta` from the API and asserts that:
+- every filter group, sort option, rankings option and count on screen matches it exactly;
+- quick links lead to real results;
+- price history rows match the API.
+
+Hard-coding a list in the UI makes those tests fail.
+
 ## Architecture and decisions
 
 - **Server Components fetch from the API** (`src/lib/api.ts`). The browser never calls the API directly, so:
@@ -76,7 +100,7 @@ API_URL=http://localhost:3000 npm run dev          # http://localhost:3001
 ```bash
 npm run typecheck
 npm test               # 31 unit tests (vitest): price/token/date formatting, URL-state helpers
-npm run test:e2e       # 58 Playwright tests, desktop + Pixel 7, against the running app (WEB_URL, default :3001)
+npm run test:e2e       # 72 Playwright tests, desktop + Pixel 7, against the running app (WEB_URL, default :3001; API_URL, default :3000)
 ```
 
 The browser tests expect the API seeded with the demo catalogue. They cover:

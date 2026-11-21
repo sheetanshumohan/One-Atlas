@@ -43,3 +43,4 @@ jobs:
         run: npm run test:e2e
         env:
           WEB_URL: ${{ inputs.web_url }}
+          API_URL: ${{ inputs.api_url }}

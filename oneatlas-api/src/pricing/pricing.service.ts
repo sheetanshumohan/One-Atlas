@@ -1,15 +1,72 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { PriceChange, Prisma } from '@prisma/client';
 import { PrismaService, PrismaTx } from '../prisma/prisma.service';
 
+type Num = Prisma.Decimal | number | string;
+
+/** The price-relevant state of an offering (what the history log tracks). */
+export interface PriceSnapshot {
+  inputPricePerMTok: Num;
+  outputPricePerMTok: Num;
+  cachedInputPerMTok: Num | null;
+  isAvailable: boolean;
+}
+
+const decEq = (a: Num | null, b: Num | null): boolean =>
+  a === null || b === null ? a === b : new Prisma.Decimal(a).equals(new Prisma.Decimal(b));
+
+/** Pure: which history event (if any) a before → after transition represents. Unit-tested. */
+export function classifyPriceChange(before: PriceSnapshot | null, after: PriceSnapshot | null): PriceChange | null {
+  if (!before && !after) return null;
+  if (!before) return PriceChange.CREATED;
+  if (!after) return PriceChange.REMOVED;
+  const same =
+    decEq(before.inputPricePerMTok, after.inputPricePerMTok) &&
+    decEq(before.outputPricePerMTok, after.outputPricePerMTok) &&
+    decEq(before.cachedInputPerMTok, after.cachedInputPerMTok) &&
+    before.isAvailable === after.isAvailable;
+  return same ? null : PriceChange.UPDATED;
+}
+
 /**
- * Owns the denormalised pricing columns on Model (minInputPrice, minOutputPrice, providerCount).
- * Every code path that mutates ModelProvider rows calls `recompute` with the same transaction
- * client, so the summary columns can never drift from the source rows.
+ * Owns everything price-related that must stay consistent with ModelProvider rows:
+ *  - the denormalised summary on Model (minInputPrice, minOutputPrice, providerCount), and
+ *  - the append-only PriceHistory log.
+ * Every code path that mutates offerings calls these with the SAME transaction client, so neither the
+ * summary nor the history can drift from the source rows.
  */
 @Injectable()
 export class PricingService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Writes a history row for an offering change, only when prices or availability actually changed
+   * (re-saving identical data is not an event). REMOVED rows keep the last known prices.
+   */
+  async recordChange(
+    tx: PrismaTx,
+    ref: { modelId: string; providerId: string },
+    before: PriceSnapshot | null,
+    after: PriceSnapshot | null,
+    source: string,
+  ): Promise<PriceChange | null> {
+    const change = classifyPriceChange(before, after);
+    if (!change) return null;
+    const snap = (after ?? before)!;
+    await tx.priceHistory.create({
+      data: {
+        modelId: ref.modelId,
+        providerId: ref.providerId,
+        change,
+        inputPricePerMTok: snap.inputPricePerMTok,
+        outputPricePerMTok: snap.outputPricePerMTok,
+        cachedInputPerMTok: snap.cachedInputPerMTok,
+        isAvailable: change === PriceChange.REMOVED ? false : snap.isAvailable,
+        source: source.slice(0, 64),
+      },
+    });
+    return change;
+  }
 
   /**
    * Serialises concurrent offering writes per model: must be called at the START of any transaction

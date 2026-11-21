@@ -1,22 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MODEL_TYPE_LABEL } from '@/lib/format';
+import { formatPrice } from '@/lib/format';
 import { toggle } from '@/lib/query';
-import type { ModelType } from '@/lib/types';
+import type { Meta } from '@/lib/types';
 import { useUrlState } from './use-url-state';
 
-export interface FilterOptions {
-  organizations: { slug: string; name: string; count: number }[];
-  providers: { slug: string; name: string; count: number }[];
-  capabilities: { slug: string; name: string; count: number }[];
-}
-
-const TYPES = Object.keys(MODEL_TYPE_LABEL) as ModelType[];
-const MODALITIES = ['TEXT', 'IMAGE', 'AUDIO', 'VIDEO', 'FILE'];
-const CONTEXT_OPTIONS = [
-  ['', 'Any'], ['32000', '≥ 32K'], ['128000', '≥ 128K'], ['200000', '≥ 200K'], ['1000000', '≥ 1M'],
-] as const;
+/**
+ * Every option below comes from GET /meta (facets derived from the database, with live counts).
+ * The panel holds no catalogue data of its own: a new model type, lab, provider, capability or
+ * context size appears here automatically, and options with no models never appear.
+ */
+export type FilterOptions = Meta['facets'];
 
 /** Every change updates the URL (page reset to 1); the server component re-renders with fresh API data. */
 export function FilterPanel({ options }: { options: FilterOptions }) {
@@ -79,33 +74,36 @@ export function FilterPanel({ options }: { options: FilterOptions }) {
         </div>
       </form>
 
-      {checkboxGroup('type', 'Model type', TYPES.map((t) => ({ value: t, label: MODEL_TYPE_LABEL[t] })).slice(0, 7))}
+      {checkboxGroup('type', 'Model type', options.modelTypes)}
       {checkboxGroup('organization', 'Company / lab', options.organizations.map((o) => ({ value: o.slug, label: o.name, count: o.count })))}
       {checkboxGroup('provider', 'Available on', options.providers.map((o) => ({ value: o.slug, label: o.name, count: o.count })))}
       {checkboxGroup('capability', 'Capabilities (all of)', options.capabilities.map((o) => ({ value: o.slug, label: o.name, count: o.count })))}
-      {checkboxGroup('inputModality', 'Input modalities (all of)', MODALITIES.map((m) => ({ value: m, label: m[0] + m.slice(1).toLowerCase() })))}
+      {checkboxGroup('inputModality', 'Input modalities (all of)', options.inputModalities)}
+      {checkboxGroup('status', 'Status', options.statuses)}
 
       <div className="space-y-4 border-t border-white/[0.06] py-4">
-        <label className="flex cursor-pointer items-center gap-2.5 text-sm text-slate-300">
-          <input type="checkbox" className="checkbox" checked={url.get('openWeights') === 'true'} onChange={(e) => apply({ openWeights: e.target.checked ? 'true' : [] })} />
-          Open weights only
-        </label>
-        <label className="flex cursor-pointer items-center gap-2.5 text-sm text-slate-300">
-          <input type="checkbox" className="checkbox" checked={url.get('status') === 'PREVIEW,ACTIVE'} onChange={(e) => apply({ status: e.target.checked ? 'PREVIEW,ACTIVE' : [] })} />
-          Hide deprecated
-        </label>
-        <div>
-          <label htmlFor="minContext" className="eyebrow mb-2 block">
-            Context window
+        {options.openWeights > 0 && (
+          <label className="flex cursor-pointer items-center gap-2.5 text-sm text-slate-300">
+            <input type="checkbox" className="checkbox" checked={url.get('openWeights') === 'true'} onChange={(e) => apply({ openWeights: e.target.checked ? 'true' : [] })} />
+            <span className="flex-1">Open weights only</span>
+            <span className="rounded-md bg-white/[0.05] px-1.5 text-[11px] tabular-nums text-slate-500">{options.openWeights}</span>
           </label>
-          <select id="minContext" className="input" value={url.get('minContext') ?? ''} onChange={(e) => apply({ minContext: e.target.value || [] })}>
-            {CONTEXT_OPTIONS.map(([v, l]) => (
-              <option key={v} value={v}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </div>
+        )}
+        {options.contextWindows.length > 0 && (
+          <div>
+            <label htmlFor="minContext" className="eyebrow mb-2 block">
+              Context window
+            </label>
+            <select id="minContext" className="input" value={url.get('minContext') ?? ''} onChange={(e) => apply({ minContext: e.target.value || [] })}>
+              <option value="">Any ({options.totalModels})</option>
+              {options.contextWindows.map((b) => (
+                <option key={b.min} value={String(b.min)}>
+                  {b.label} ({b.count})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <form
           action={url.pathname}
           method="get"
@@ -120,7 +118,18 @@ export function FilterPanel({ options }: { options: FilterOptions }) {
             Max input price ($/1M)
           </label>
           <div className="flex gap-2">
-            <input id="maxInputPrice" name="maxInputPrice" className="input" type="number" min="0" step="0.01" inputMode="decimal" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="e.g. 1" />
+            <input
+              id="maxInputPrice"
+              name="maxInputPrice"
+              className="input"
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(e.target.value)}
+              placeholder={options.inputPrice.min !== null && options.inputPrice.max !== null ? `${formatPrice(options.inputPrice.min)} – ${formatPrice(options.inputPrice.max)}` : 'Any'}
+            />
             <button className="btn-secondary" type="submit">
               Apply
             </button>

@@ -211,3 +211,18 @@ export const models: SeedModel[] = [
     offers: [['azure-ai', 'Phi-4', 0.125, 0.5], ['deepinfra', 'microsoft/phi-4', 0.07, 0.14], ['openrouter', 'microsoft/phi-4', 0.07, 0.14]],
     scores: { 'mmlu-pro': 70.4, 'gpqa-diamond': 56.1, 'math-500': 80.4, humaneval: 82.6, ifeval: 63.0, 'lmarena-elo': 1205 } },
 ];
+
+/**
+ * Known public price changes, oldest first: [model, provider, ISO date, input $/1M, output $/1M].
+ * The LAST entry of each (model, provider) timeline must equal that offering's current price above —
+ * the seed refuses to run otherwise, so history and current prices are always consistent.
+ * Offerings without an entry get a single "listed" event at the model's release date.
+ */
+export const priceTimelines: [model: string, provider: string, date: string, input: number, output: number][] = [
+  ['gpt-4o', 'openai-api', '2024-05-13', 5, 15],
+  ['gpt-4o', 'openai-api', '2024-08-06', 2.5, 10],
+  ['gemini-1.5-pro', 'google-ai-studio', '2024-05-14', 3.5, 10.5],
+  ['gemini-1.5-pro', 'google-ai-studio', '2024-10-01', 1.25, 5],
+  ['deepseek-v3', 'deepseek-api', '2024-12-26', 0.14, 0.28],
+  ['deepseek-v3', 'deepseek-api', '2025-02-08', 0.27, 1.1],
+];

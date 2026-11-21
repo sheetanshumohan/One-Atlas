@@ -5,6 +5,7 @@ import { ModelList } from '@/components/model-list';
 import { SortSelect } from '@/components/sort-select';
 import { EmptyState, PageHeader, Pagination } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
+import { getMeta } from '@/lib/meta';
 import { readList, readPage, readString, withParams, type SearchParams } from '@/lib/query';
 
 export const metadata: Metadata = { title: 'Models' };
@@ -31,16 +32,9 @@ export default async function ModelsPage({ searchParams }: { searchParams: Promi
     pageSize: PAGE_SIZE,
   };
 
-  const [orgs, providers, capabilities] = await Promise.all([
-    api.organizations({ pageSize: 100 }),
-    api.providers({ pageSize: 100 }),
-    api.capabilities(),
-  ]);
-  const options: FilterOptions = {
-    organizations: orgs.data.filter((o) => o.modelCount > 0).map((o) => ({ slug: o.slug, name: o.name, count: o.modelCount })),
-    providers: providers.data.filter((p) => p.modelCount > 0).map((p) => ({ slug: p.slug, name: p.name, count: p.modelCount })),
-    capabilities: capabilities.data.filter((c) => c.modelCount > 0).map((c) => ({ slug: c.slug, name: c.name, count: c.modelCount })),
-  };
+  // Every filter option, sort choice and count comes from GET /meta (derived from the database).
+  const meta = await getMeta();
+  const options: FilterOptions = meta.facets;
 
   let content: React.ReactNode;
   let total = 0;
@@ -70,7 +64,7 @@ export default async function ModelsPage({ searchParams }: { searchParams: Promi
   return (
     <>
       <PageHeader eyebrow="Model explorer" title="Models" description="Browse, search and filter AI models by lab, provider, capability and type. Prices are the cheapest available, in USD per 1M tokens.">
-          <SortSelect />
+          <SortSelect presets={meta.sortPresets} sorts={meta.sorts} />
       </PageHeader>
       <div className="grid items-start gap-6 lg:grid-cols-[280px_1fr]">
         <FiltersShell>

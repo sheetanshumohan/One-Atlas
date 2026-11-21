@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { auth, createTestApp, TestApp } from './helpers/app';
-import { pricingInconsistencies, seedFixtures } from './helpers/fixtures';
+import { priceHistoryInconsistencies, pricingInconsistencies, seedFixtures } from './helpers/fixtures';
 
 const record = (id: string, over: Record<string, unknown> = {}) => ({
   id,
@@ -22,7 +22,10 @@ describe('Data ingestion & normalisation (e2e)', () => {
     t = await createTestApp();
   });
   beforeEach(() => seedFixtures(t.prisma));
-  afterEach(async () => expect(await pricingInconsistencies(t.prisma)).toEqual([]));
+  afterEach(async () => {
+    expect(await pricingInconsistencies(t.prisma)).toEqual([]);
+    expect(await priceHistoryInconsistencies(t.prisma)).toEqual([]);
+  });
   afterAll(() => t.close());
 
   const batch = [

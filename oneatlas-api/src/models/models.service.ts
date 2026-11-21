@@ -2,10 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { paginate, pageArgs, Paginated } from '../common/dto/pagination.dto';
 import { notFound, validationError } from '../common/errors';
+import { dec } from '../common/utils/decimal';
 import { isValidSlug, slugify } from '../common/utils/slug';
 import { PricingService } from '../pricing/pricing.service';
 import { PrismaService, PrismaTx } from '../prisma/prisma.service';
 import { CompareModelsQueryDto } from './dto/compare-models.query';
+import { PriceHistoryQueryDto } from './dto/price-history.query';
 import { ListModelsQueryDto } from './dto/list-models.query';
 import { CreateModelDto, UpdateModelDto, UpsertBenchmarkResultDto, UpsertOfferingDto } from './dto/model-write.dto';
 import { buildModelOrderBy, buildModelWhere } from './model-query.builder';
@@ -70,6 +72,39 @@ export class ModelsService {
     });
     if (!model) throw notFound('Model', slug);
     return { data: model.offerings.map(presentOffering) };
+  }
+
+  /** Append-only price log for a model, newest first (optionally for one provider). */
+  async priceHistory(slug: string, q: PriceHistoryQueryDto) {
+    const model = await this.prisma.model.findUnique({ where: { slug }, select: { id: true } });
+    if (!model) throw notFound('Model', slug);
+    if (q.provider && !(await this.prisma.provider.findUnique({ where: { slug: q.provider }, select: { id: true } }))) {
+      throw notFound('Provider', q.provider);
+    }
+    const where: Prisma.PriceHistoryWhereInput = { modelId: model.id, ...(q.provider ? { provider: { slug: q.provider } } : {}) };
+    const [total, rows] = await this.prisma.$transaction([
+      this.prisma.priceHistory.count({ where }),
+      this.prisma.priceHistory.findMany({
+        where,
+        include: { provider: { select: { slug: true, name: true } } },
+        orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
+        ...pageArgs(q),
+      }),
+    ]);
+    return paginate(
+      rows.map((r) => ({
+        provider: r.provider,
+        change: r.change,
+        inputPricePerMTok: dec(r.inputPricePerMTok),
+        outputPricePerMTok: dec(r.outputPricePerMTok),
+        cachedInputPerMTok: dec(r.cachedInputPerMTok),
+        isAvailable: r.isAvailable,
+        source: r.source,
+        recordedAt: r.recordedAt.toISOString(),
+      })),
+      total,
+      q,
+    );
   }
 
   // ---------------------------------------------------------------- writes
@@ -178,12 +213,15 @@ export class ModelsService {
         uptimePct: dto.uptimePct ?? null,
         isAvailable: dto.isAvailable ?? true,
       };
+      const ref = { modelId: model.id, providerId: provider.id };
+      const before = await tx.modelProvider.findUnique({ where: { modelId_providerId: ref } });
       const offering = await tx.modelProvider.upsert({
-        where: { modelId_providerId: { modelId: model.id, providerId: provider.id } },
-        create: { modelId: model.id, providerId: provider.id, ...fields },
+        where: { modelId_providerId: ref },
+        create: { ...ref, ...fields },
         update: fields,
         include: { provider: { select: { slug: true, name: true, website: true } } },
       });
+      await this.pricing.recordChange(tx, ref, before, offering, 'api');
       await this.pricing.recompute(tx, [model.id]);
       return presentOffering(offering);
     });
@@ -194,8 +232,10 @@ export class ModelsService {
       const model = await tx.model.findUnique({ where: { slug: modelSlug }, select: { id: true } });
       if (!model) throw notFound('Model', modelSlug);
       await this.pricing.lockModels(tx, [model.id]);
-      const { count } = await tx.modelProvider.deleteMany({ where: { modelId: model.id, provider: { slug: providerSlug } } });
-      if (count === 0) throw notFound('Offering', `${modelSlug}@${providerSlug}`);
+      const before = await tx.modelProvider.findFirst({ where: { modelId: model.id, provider: { slug: providerSlug } } });
+      if (!before) throw notFound('Offering', `${modelSlug}@${providerSlug}`);
+      await tx.modelProvider.delete({ where: { id: before.id } });
+      await this.pricing.recordChange(tx, { modelId: model.id, providerId: before.providerId }, before, null, 'api');
       await this.pricing.recompute(tx, [model.id]);
     });
   }

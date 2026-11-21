@@ -11,7 +11,7 @@ pricing, capabilities, benchmarks, rankings, global search and data ingestion.
 | Interactive API docs (Swagger UI) | `GET /docs` |
 | OpenAPI 3 spec | `GET /docs-json` |
 | Base path | `/api/v1` |
-| Tests | **455 tests** (181 unit + 274 e2e against a real PostgreSQL), ~97% line coverage |
+| Tests | **485 tests** (197 unit + 288 e2e against a real PostgreSQL) |
 | Web app | [`../oneatlas-web`](../oneatlas-web/README.md): the Next.js + Tailwind product UI built on this API |
 
 ---
@@ -96,6 +96,7 @@ erDiagram
 | `ModelProvider` | **Pricing lives on the offering**, because the same model costs different amounts on different providers. Unique `(modelId, providerId)`. Also stores latency, throughput, uptime and `isAvailable`. |
 | `Capability` / `ModelCapability` | Normalised capability catalogue (M:N), e.g. `tool-calling` or `vision`, instead of free-text tags. |
 | `Benchmark` / `BenchmarkResult` | Each benchmark declares its scale (`minScore`, `maxScore`, `higherIsBetter`, `unit`), so Elo ratings, percentages and error rates can be ranked together. Unique `(modelId, benchmarkId)`. |
+| `PriceHistory` | **Append-only log of every price event** (`CREATED` / `UPDATED` / `REMOVED`, with prices, availability, source and time). Written in the same transaction as the offering change; indexed `(modelId, recordedAt DESC)`. |
 
 **Integrity is enforced in the database too, not only in the API:**
 - CHECK constraints: non-negative prices, positive context and token limits, uptime between 0 and 100, `maxScore > minScore`.
@@ -113,6 +114,16 @@ erDiagram
    - `PricingService` recomputes them inside the same transaction as every offering write. That covers create, update and delete, provider deletion (cascade) and ingestion.
    - Each such transaction first takes `SELECT … FOR UPDATE` on the model row(s), in sorted order to avoid deadlocks. Without this lock, two concurrent READ COMMITTED transactions can persist a stale summary. An e2e race test reproduced that failure before the fix and passes after it.
    - The e2e write suites assert the invariant (summary == fresh aggregate) after **every** test. `POST /ingest/recompute-pricing` is a repair endpoint.
+1a. **Price history as an append-only audit log.** Every path that changes an offering (API create, update and delete; ingestion; seed) calls `PricingService.recordChange` in the **same transaction**.
+   - It writes a `CREATED` / `UPDATED` / `REMOVED` event only when prices or availability really changed. Re-saving or re-ingesting identical data is not an event.
+   - Prices are compared as exact decimals, so `2.5` and `"2.500000"` are equal.
+   - `recordedAt` defaults to `clock_timestamp()`, the time of the write, rather than `now()`, the transaction start. Writers are serialised by the model row lock, so the history order always equals the real order of changes, even under concurrency.
+   - The migration **backfills** a `CREATED` event for every pre-existing offering. Invariant: each offering's latest event equals its current price. It is asserted after every e2e write test, in the live check, and was verified on a simulated production upgrade.
+1b. **`GET /meta`: the API, not the client, owns catalogue knowledge.**
+   - Labels for every enum, every filter option with live counts, context buckets, price range, sort presets and limits are derived from the database in one transaction.
+   - Options with no models never appear.
+   - E2e tests assert that each facet count equals the matching `/models` filter's total, so `/meta` can't drift from the data.
+   - The web app keeps no catalogue lists of its own.
 2. **Normalised benchmark scores.** Every score is mapped to 0–100, where 100 is always best (`normalizeScore`). That makes it possible to:
    - rank lower-is-better benchmarks;
    - compare Elo ratings with percentages;
@@ -164,6 +175,8 @@ Full, interactive reference: **`/docs`**. All prices are **USD per 1M tokens**. 
 | GET | `/rankings` | Leaderboards: `benchmark=` (single), `category=` (aggregate), or overall; filters `type`, `organization`, `openWeights`, `minBenchmarks` |
 | GET | `/capabilities` | Capability catalogue with model counts |
 | GET | `/search?q=` | Global search across models, labs, providers, benchmarks (relevance ranked) |
+| GET | `/models/:slug/price-history` | Price change log, newest first (filter `provider`, paginated) |
+| GET | `/meta` | **Single source of truth for clients**: labels for every enum, filter options with live counts (types, statuses, labs, providers, capabilities, modalities, context buckets, price range), sort options, limits |
 | GET | `/stats`, `/health` | Catalogue totals; liveness + DB check |
 | POST/PATCH/DELETE | `/models`, `/organizations`, `/providers`, `/benchmarks`, `POST /capabilities` | Admin CRUD 🔒 |
 | PUT/DELETE | `/models/:slug/providers/:provider` | Upsert/remove pricing offering 🔒 |
@@ -182,8 +195,8 @@ Full, interactive reference: **`/docs`**. All prices are **USD per 1M tokens**. 
 createdb oneatlas_test          # .env.test points at it; or export DATABASE_URL=.../oneatlas_test
 
 npm test                        # unit + e2e
-npm run test:unit               # 181 pure-logic tests (no DB)
-npm run test:e2e                # 274 HTTP tests against real PostgreSQL (migrations applied automatically)
+npm run test:unit               # 197 pure-logic tests (no DB)
+npm run test:e2e                # 288 HTTP tests against real PostgreSQL (migrations applied automatically)
 npm run test:cov                # coverage report
 ```
 

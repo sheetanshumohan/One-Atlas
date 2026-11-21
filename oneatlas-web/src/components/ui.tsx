@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ModelStatus, ModelType } from '@/lib/types';
-import { MODEL_TYPE_LABEL, STATUS_LABEL } from '@/lib/format';
+import { getLabels } from '@/lib/meta';
 
 export function PageHeader({ eyebrow, title, description, children }: { eyebrow?: string; title: string; description?: React.ReactNode; children?: React.ReactNode }) {
   return (
@@ -33,15 +33,18 @@ export function Badge({ children, tone = 'slate', title }: { children: React.Rea
   );
 }
 
+// Colour per type/status is presentation; the TEXT of every badge comes from the API (GET /meta labels).
 const TYPE_TONE: Partial<Record<ModelType, Tone>> = { REASONING: 'cyan', CODE: 'amber', EMBEDDING: 'green' };
 
-export function TypeBadge({ type }: { type: ModelType }) {
-  return <Badge tone={TYPE_TONE[type] ?? 'brand'}>{MODEL_TYPE_LABEL[type]}</Badge>;
+export async function TypeBadge({ type }: { type: ModelType }) {
+  const labels = await getLabels();
+  return <Badge tone={TYPE_TONE[type] ?? 'brand'}>{labels.modelType[type] ?? type}</Badge>;
 }
 
-export function StatusBadge({ status }: { status: ModelStatus }) {
+export async function StatusBadge({ status }: { status: ModelStatus }) {
   if (status === 'ACTIVE') return null;
-  return <Badge tone={status === 'PREVIEW' ? 'amber' : 'red'}>{STATUS_LABEL[status]}</Badge>;
+  const labels = await getLabels();
+  return <Badge tone={status === 'PREVIEW' ? 'amber' : 'red'}>{labels.modelStatus[status] ?? status}</Badge>;
 }
 
 const GRADIENTS = [

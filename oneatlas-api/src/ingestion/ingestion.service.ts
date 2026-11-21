@@ -91,7 +91,7 @@ export class IngestionService {
     const orgsCreated = new Set<string>();
     for (const { index, value } of valid) {
       try {
-        const outcome = await this.prisma.$transaction((tx) => this.writeRecord(tx, provider.id, value, orgsCreated));
+        const outcome = await this.prisma.$transaction((tx) => this.writeRecord(tx, provider.id, value, orgsCreated, `ingestion:${dto.provider}`));
         report[outcome] += 1;
       } catch (e) {
         const reason = e instanceof IngestRecordError ? e.message : 'database error while writing record';
@@ -104,7 +104,7 @@ export class IngestionService {
     return report;
   }
 
-  private async writeRecord(tx: PrismaTx, providerId: string, m: NormalizedModel, orgsCreated: Set<string>): Promise<'created' | 'updated'> {
+  private async writeRecord(tx: PrismaTx, providerId: string, m: NormalizedModel, orgsCreated: Set<string>, source: string): Promise<'created' | 'updated'> {
     let org = await tx.organization.findUnique({ where: { slug: m.organizationSlug }, select: { id: true } });
     if (!org) {
       org = await tx.organization.create({
@@ -179,11 +179,14 @@ export class IngestionService {
       maxOutputTokens: m.offering.maxOutputTokens,
       isAvailable: true,
     };
-    await tx.modelProvider.upsert({
+    const before = await tx.modelProvider.findUnique({ where: { modelId_providerId: { modelId, providerId } } });
+    const after = await tx.modelProvider.upsert({
       where: { modelId_providerId: { modelId, providerId } },
       create: { modelId, providerId, ...offering },
       update: offering,
     });
+    // Re-ingesting unchanged prices writes no history (classifyPriceChange returns null).
+    await this.pricing.recordChange(tx, { modelId, providerId }, before, after, source);
     await this.pricing.recompute(tx, [modelId]);
     return outcome;
   }

@@ -9,6 +9,7 @@ import { ConfigModule } from './config/config.module';
 import { APP_CONFIG, AppConfig } from './config/env';
 import { HealthModule } from './health/health.module';
 import { IngestionModule } from './ingestion/ingestion.module';
+import { MetaModule } from './meta/meta.module';
 import { ModelsModule } from './models/models.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { PricingModule } from './pricing/pricing.module';
@@ -37,6 +38,7 @@ import { StatsModule } from './stats/stats.module';
     SearchModule,
     StatsModule,
     IngestionModule,
+    MetaModule,
     HealthModule,
   ],
   controllers: [RootController],

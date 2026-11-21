@@ -2,10 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { MAX_COMPARE } from '@/lib/query';
 
 /** Add/remove models on the compare page; the selection is the URL (?models=a,b,c), so comparisons are shareable. */
-export function ComparePicker({ selected, options }: { selected: { slug: string; name: string }[]; options: { slug: string; name: string; org: string }[] }) {
+export function ComparePicker({ selected, options, max }: { selected: { slug: string; name: string }[]; options: { slug: string; name: string; org: string }[]; max: number }) {
   const router = useRouter();
   const [choice, setChoice] = useState('');
   const go = (slugs: string[]) => router.push(slugs.length ? `/compare?models=${slugs.join(',')}` : '/compare');
@@ -33,8 +32,8 @@ export function ComparePicker({ selected, options }: { selected: { slug: string;
         <label htmlFor="add-model" className="sr-only">
           Add a model
         </label>
-        <select id="add-model" className="input !w-64" value={choice} onChange={(e) => setChoice(e.target.value)} disabled={slugs.length >= MAX_COMPARE}>
-          <option value="">{slugs.length >= MAX_COMPARE ? 'Maximum 6 models' : 'Add a model…'}</option>
+        <select id="add-model" className="input !w-64" value={choice} onChange={(e) => setChoice(e.target.value)} disabled={slugs.length >= max}>
+          <option value="">{slugs.length >= max ? `Maximum ${max} models` : 'Add a model…'}</option>
           {available.map((o) => (
             <option key={o.slug} value={o.slug}>
               {o.name} — {o.org}

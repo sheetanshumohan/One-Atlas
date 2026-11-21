@@ -14,7 +14,7 @@ export class RootController {
       openapi: '/docs-json',
       endpoints: [
         '/api/v1/models', '/api/v1/models/compare', '/api/v1/organizations', '/api/v1/providers',
-        '/api/v1/benchmarks', '/api/v1/rankings', '/api/v1/capabilities', '/api/v1/search', '/api/v1/stats', '/api/v1/health',
+        '/api/v1/benchmarks', '/api/v1/rankings', '/api/v1/capabilities', '/api/v1/search', '/api/v1/stats', '/api/v1/meta', '/api/v1/health',
       ],
     };
   }

@@ -12,7 +12,7 @@ export function CompareButton({ slug, name, size = 'sm' }: { slug: string; name:
       onClick={() => compare.toggle({ slug, name })}
       disabled={disabled}
       aria-pressed={active}
-      title={disabled ? 'You can compare up to 6 models' : active ? 'Remove from comparison' : 'Add to comparison'}
+      title={disabled ? `You can compare up to ${compare.max} models at once` : active ? 'Remove from comparison' : 'Add to comparison'}
       className={`${active ? 'btn-primary' : 'btn-secondary'} ${size === 'sm' ? '!rounded-lg !px-2.5 !py-1 text-xs' : ''}`}
       data-testid={`compare-${slug}`}
     >

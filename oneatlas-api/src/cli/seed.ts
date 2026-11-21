@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { benchmarks, capabilities, models, organizations, providers } from './seed-data';
+import { benchmarks, capabilities, models, organizations, priceTimelines, providers } from './seed-data';
 
 const prisma = new PrismaClient();
 
@@ -62,6 +62,35 @@ export async function seed(client: PrismaClient = prisma): Promise<void> {
           create: { modelId: model.id, providerId, ...fields },
           update: fields,
         });
+
+        // Price history (idempotent). Placeholder rows from the migration backfill are replaced by the seed's
+        // timeline; any other existing history (API / ingestion / earlier seed) is left untouched.
+        const existing = await tx.priceHistory.findMany({ where: { modelId: model.id, providerId }, select: { source: true } });
+        if (existing.every((h) => h.source === 'backfill')) {
+          await tx.priceHistory.deleteMany({ where: { modelId: model.id, providerId, source: 'backfill' } });
+          const timeline = priceTimelines.filter(([tm, tp]) => tm === m.slug && tp === provider);
+          const events = timeline.length
+            ? timeline.map(([, , date, i, o], idx) => ({ date, input: i, output: o, change: idx === 0 ? ('CREATED' as const) : ('UPDATED' as const) }))
+            : [{ date: m.release ?? '2024-01-01', input, output, change: 'CREATED' as const }];
+          const last = events[events.length - 1];
+          if (last.input !== input || last.output !== output) {
+            throw new Error(`Seed price timeline for ${m.slug}@${provider} must end at the current price ${input}/${output}`);
+          }
+          await tx.priceHistory.createMany({
+            data: events.map((e, idx) => ({
+              modelId: model.id,
+              providerId,
+              change: e.change,
+              inputPricePerMTok: e.input,
+              outputPricePerMTok: e.output,
+              // cached price / availability are only known for the current state
+              cachedInputPerMTok: idx === events.length - 1 ? fields.cachedInputPerMTok : null,
+              isAvailable: idx === events.length - 1 ? fields.isAvailable : true,
+              source: 'seed',
+              recordedAt: new Date(e.date),
+            })),
+          });
+        }
       }
       for (const [bench, score] of Object.entries(m.scores)) {
         const benchmarkId = req(benchIds, bench, 'benchmark');

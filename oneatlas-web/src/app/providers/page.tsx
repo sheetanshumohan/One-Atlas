@@ -6,12 +6,13 @@ import { api } from '@/lib/api';
 export const metadata: Metadata = { title: 'Providers' };
 
 export default async function ProvidersPage() {
-  const providers = await api.providers({ sort: 'modelCount', pageSize: 100 });
+  // All providers (follows pagination — never silently capped).
+  const providers = await api.allProviders({ sort: 'modelCount' });
   return (
     <>
       <PageHeader eyebrow="Directory" title="Inference providers" description="Platforms that serve models via API. The same model often costs different amounts on different providers." />
       <ul className="stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="providers-grid">
-        {providers.data.map((p) => (
+        {providers.map((p) => (
           <li key={p.slug}>
             <Link href={`/providers/${p.slug}`} className="card card-hover group flex h-full flex-col p-6">
               <div className="flex items-center gap-3">

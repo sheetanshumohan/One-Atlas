@@ -4,7 +4,8 @@ import { notFound } from 'next/navigation';
 import { CompareButton } from '@/components/compare-button';
 import { Avatar, Badge, ScoreBar, Stat, StatusBadge, TypeBadge } from '@/components/ui';
 import { api } from '@/lib/api';
-import { CATEGORY_LABEL, formatDate, formatNumber, formatParams, formatPrice, formatScore, formatTokens, modalityLabel } from '@/lib/format';
+import { formatDate, formatNumber, formatParams, formatPrice, formatScore, formatTokens } from '@/lib/format';
+import { getLabels } from '@/lib/meta';
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -14,8 +15,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ModelDetailPage({ params }: Props) {
-  const m = await api.model((await params).slug);
+  const slug = (await params).slug;
+  const m = await api.model(slug);
   if (!m) notFound();
+  // Labels and the price-change log both come from the API.
+  const [labels, history] = await Promise.all([getLabels(), api.priceHistory(slug, { pageSize: 20 })]);
 
   const specs: [string, React.ReactNode][] = [
     ['Released', formatDate(m.releaseDate)],
@@ -25,8 +29,8 @@ export default async function ModelDetailPage({ params }: Props) {
     ['Parameters', formatParams(m.parameterCountB)],
     ['Weights', m.openWeights ? 'Open' : 'Closed'],
     ['License', m.license ?? '—'],
-    ['Input', m.inputModalities.map(modalityLabel).join(', ')],
-    ['Output', m.outputModalities.map(modalityLabel).join(', ')],
+    ['Input', m.inputModalities.map((x) => labels.modality[x]).join(', ')],
+    ['Output', m.outputModalities.map((x) => labels.modality[x]).join(', ')],
   ];
   const cheapestIn = m.pricing.minInputPricePerMTok;
 
@@ -161,6 +165,52 @@ export default async function ModelDetailPage({ params }: Props) {
         </section>
       </div>
 
+      <section className="card animate-fade-up overflow-hidden" aria-labelledby="history-h">
+        <div className="flex flex-wrap items-end justify-between gap-2 px-6 pt-6">
+          <div>
+            <h2 id="history-h" className="text-lg font-semibold">
+              Price history
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">Every listing, price change and delisting, newest first (USD per 1M tokens).</p>
+          </div>
+          {history.meta.total > history.data.length && <span className="text-xs text-slate-500">Showing latest {history.data.length} of {history.meta.total}</span>}
+        </div>
+        {history.data.length === 0 ? (
+          <p className="p-6 text-sm text-slate-500">No price events recorded.</p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full" data-testid="price-history">
+              <thead className="border-y border-white/[0.06] bg-white/[0.02]">
+                <tr>
+                  <th className="th">Date</th>
+                  <th className="th">Provider</th>
+                  <th className="th">Event</th>
+                  <th className="th text-right">Input</th>
+                  <th className="th text-right">Output</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.05]">
+                {history.data.map((h, i) => (
+                  <tr key={`${h.provider.slug}-${h.recordedAt}-${i}`} className="transition-colors hover:bg-white/[0.03]">
+                    <td className="td text-slate-400">{formatDate(h.recordedAt)}</td>
+                    <td className="td">
+                      <Link href={`/providers/${h.provider.slug}`} className="text-white transition hover:text-brand-300">
+                        {h.provider.name}
+                      </Link>
+                    </td>
+                    <td className="td">
+                      <Badge tone={h.change === 'CREATED' ? 'green' : h.change === 'REMOVED' ? 'red' : 'amber'}>{labels.priceChange[h.change]}</Badge>
+                    </td>
+                    <td className="td text-right tabular-nums text-white">{formatPrice(h.inputPricePerMTok)}</td>
+                    <td className="td text-right tabular-nums text-slate-300">{formatPrice(h.outputPricePerMTok)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       <section className="card animate-fade-up overflow-hidden" aria-labelledby="bench-h">
         <div className="px-6 pt-6">
           <h2 id="bench-h" className="text-lg font-semibold">
@@ -190,7 +240,7 @@ export default async function ModelDetailPage({ params }: Props) {
                       </Link>
                       {!b.benchmark.higherIsBetter && <span className="ml-1.5 text-xs text-slate-500">(lower is better)</span>}
                     </td>
-                    <td className="td text-slate-400">{CATEGORY_LABEL[b.benchmark.category]}</td>
+                    <td className="td text-slate-400">{labels.benchmarkCategory[b.benchmark.category]}</td>
                     <td className="td text-right tabular-nums text-white">{formatScore(b.score, b.benchmark.unit)}</td>
                     <td className="td">
                       <ScoreBar value={b.normalizedScore} />

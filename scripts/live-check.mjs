@@ -153,6 +153,39 @@ check('compare cheapest input', cmp.highlights.cheapestInput.join() === 'llama-3
 check('search finds models', (await get('/search?q=llama')).body.models.length > 0);
 check('stats match catalogue', (await get('/stats')).body.totals.models === total);
 
+// 8a. GET /meta is the single source of truth for clients: every facet count must equal the
+//     number of results of the matching /models filter, and options with no models must not appear.
+const meta = (await get('/meta')).body;
+check('meta: totalModels == catalogue size', meta.facets.totalModels === total);
+const facetChecks = [
+  ...meta.facets.modelTypes.map((f) => [`type=${f.value}`, f.count]),
+  ...meta.facets.statuses.map((f) => [`status=${f.value}`, f.count]),
+  ...meta.facets.organizations.map((f) => [`organization=${f.slug}`, f.count]),
+  ...meta.facets.providers.map((f) => [`provider=${f.slug}`, f.count]),
+  ...meta.facets.capabilities.map((f) => [`capability=${f.slug}`, f.count]),
+  ...meta.facets.inputModalities.map((f) => [`inputModality=${f.value}`, f.count]),
+  ...meta.facets.contextWindows.map((f) => [`minContext=${f.min}`, f.count]),
+  ['openWeights=true', meta.facets.openWeights],
+];
+for (const [qs, count] of facetChecks) {
+  check(`meta facet ${qs} count == /models total`, count > 0 && (await get(`/models?${qs}&pageSize=1`)).body.meta.total === count, { qs, count });
+}
+for (const p of meta.sortPresets) check(`meta sort preset ${p.sort}:${p.order} accepted`, (await get(`/models?sort=${p.sort}&order=${p.order}&pageSize=1`)).status === 200);
+
+// 8b. Price history: for every model, the newest event per provider equals the provider's current price.
+for (const m of models) {
+  const d = (await get(`/models/${m.slug}`)).body;
+  const h = (await get(`/models/${m.slug}/price-history?pageSize=100`)).body.data;
+  for (const p of d.providers) {
+    const latest = h.find((e) => e.provider.slug === p.provider.slug);
+    check(`${m.slug}@${p.provider.slug}: latest history == current price`,
+      latest && latest.change !== 'REMOVED' && latest.inputPricePerMTok === p.inputPricePerMTok && latest.outputPricePerMTok === p.outputPricePerMTok && latest.isAvailable === p.isAvailable,
+      { latest, current: { in: p.inputPricePerMTok, out: p.outputPricePerMTok } });
+  }
+  const t = h.map((e) => Date.parse(e.recordedAt));
+  check(`${m.slug}: history newest first`, t.every((v, i) => i === 0 || t[i - 1] >= v));
+}
+
 // 8. errors, validation and auth (no writes succeed: no key is sent)
 const nf = await get('/models/definitely-not-a-model');
 check('404 envelope', nf.status === 404 && nf.body.error.code === 'NOT_FOUND' && typeof nf.body.requestId === 'string');

@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query
 import { ApiNoContentResponse, ApiNotFoundResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AdminOnly } from '../common/decorators/admin.decorator';
 import { CompareModelsQueryDto } from './dto/compare-models.query';
+import { PriceHistoryQueryDto } from './dto/price-history.query';
 import { ListModelsQueryDto } from './dto/list-models.query';
 import { CreateModelDto, UpdateModelDto, UpsertBenchmarkResultDto, UpsertOfferingDto } from './dto/model-write.dto';
 import { ModelsService } from './models.service';
@@ -36,6 +37,12 @@ export class ModelsController {
   @ApiOperation({ summary: 'Providers serving this model, cheapest first' })
   offerings(@Param('slug') slug: string) {
     return this.models.listOfferings(slug);
+  }
+
+  @Get(':slug/price-history')
+  @ApiOperation({ summary: 'Price change log for a model (newest first): created / updated / removed offerings' })
+  priceHistory(@Param('slug') slug: string, @Query() q: PriceHistoryQueryDto) {
+    return this.models.priceHistory(slug, q);
   }
 
   @Post()

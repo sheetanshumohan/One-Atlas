@@ -3,8 +3,9 @@ import Link from 'next/link';
 import { ComparePicker } from '@/components/compare-picker';
 import { Avatar, EmptyState, PageHeader, ScoreBar } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
-import { CATEGORY_LABEL, formatDate, formatParams, formatPrice, formatScore, formatTokens, MODEL_TYPE_LABEL, modalityLabel } from '@/lib/format';
-import { MAX_COMPARE, readList, type SearchParams } from '@/lib/query';
+import { formatDate, formatParams, formatPrice, formatScore, formatTokens } from '@/lib/format';
+import { getLabels, getMeta } from '@/lib/meta';
+import { readList, type SearchParams } from '@/lib/query';
 import type { Comparison, ModelDetail } from '@/lib/types';
 
 export const metadata: Metadata = { title: 'Compare models' };
@@ -45,13 +46,16 @@ function GroupRow({ label, span }: { label: string; span: number }) {
 }
 
 export default async function ComparePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const slugs = readList(await searchParams, 'models').slice(0, MAX_COMPARE);
-  const all = await api.models({ sort: 'name', pageSize: 100 });
-  const options = all.data.map((m) => ({ slug: m.slug, name: m.name, org: m.organization.name }));
+  const [meta, labels, all, top] = await Promise.all([getMeta(), getLabels(), api.allModels({ sort: 'name' }), api.rankings({ pageSize: 3, minBenchmarks: 3 })]);
+  const max = meta.limits.compare.max;
+  const slugs = readList(await searchParams, 'models').slice(0, max);
+  const options = all.map((m) => ({ slug: m.slug, name: m.name, org: m.organization.name }));
+  // Example comparison = today's top 3 on the leaderboard (from the API, never a hard-coded list).
+  const example = top.data.map((e) => e.model.slug);
 
   let cmp: Comparison | null = null;
   let error: string | null = null;
-  if (slugs.length >= 2) {
+  if (slugs.length >= meta.limits.compare.min) {
     try {
       cmp = await api.compare(slugs);
     } catch (e) {
@@ -65,21 +69,23 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader eyebrow="Side by side" title="Compare models" description="Pricing, context length, capabilities and benchmarks side by side. ★ marks the best value in each row." />
-      <ComparePicker selected={selected} options={options} />
+      <ComparePicker selected={selected} options={options} max={max} />
 
       <div className="mt-6">
         {error ? (
           <EmptyState title="Couldn't compare these models">{error}</EmptyState>
         ) : !cmp ? (
-          <EmptyState title="Pick at least two models">
+          <EmptyState title={`Pick at least ${meta.limits.compare.min} models`}>
             Add models above, or use the “+ Compare” buttons on the{' '}
             <Link href="/models" className="link">
               models list
             </Link>
             .{' '}
-            <Link href="/compare?models=gpt-4o,claude-3.5-sonnet,gemini-2.0-flash" className="link">
-              Try an example →
-            </Link>
+            {example.length >= meta.limits.compare.min && (
+              <Link href={`/compare?models=${example.join(',')}`} className="link">
+                Try the current top {example.length} →
+              </Link>
+            )}
           </EmptyState>
         ) : (
           <div className="card animate-fade-up overflow-x-auto">
@@ -111,10 +117,10 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
                 <Row label="Context window" items={cmp.items} render={(m) => formatTokens(m.contextWindow)} best={cmp.highlights.largestContext} />
                 <Row label="Max output" items={cmp.items} render={(m) => formatTokens(m.maxOutputTokens)} best={cmp.highlights.largestMaxOutput} />
                 <Row label="Released" items={cmp.items} render={(m) => formatDate(m.releaseDate)} best={cmp.highlights.newest} />
-                <Row label="Type" items={cmp.items} render={(m) => MODEL_TYPE_LABEL[m.type]} />
+                <Row label="Type" items={cmp.items} render={(m) => labels.modelType[m.type]} />
                 <Row label="Parameters" items={cmp.items} render={(m) => formatParams(m.parameterCountB)} />
                 <Row label="Open weights" items={cmp.items} render={(m) => (m.openWeights ? 'Yes' : 'No')} />
-                <Row label="Input modalities" items={cmp.items} render={(m) => m.inputModalities.map(modalityLabel).join(', ')} />
+                <Row label="Input modalities" items={cmp.items} render={(m) => m.inputModalities.map((x) => labels.modality[x]).join(', ')} />
                 {cmp.capabilities.length > 0 && <GroupRow label="Capabilities" span={span} />}
                 {cmp.capabilities.map((c) => (
                   <Row
@@ -128,7 +134,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
                 {cmp.benchmarks.map((b) => (
                   <Row
                     key={b.benchmark.slug}
-                    label={`${b.benchmark.name} (${CATEGORY_LABEL[b.benchmark.category]})`}
+                    label={`${b.benchmark.name} (${labels.benchmarkCategory[b.benchmark.category]})`}
                     items={cmp!.items}
                     best={b.best}
                     render={(m) =>

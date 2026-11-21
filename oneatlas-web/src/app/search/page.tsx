@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ModelList } from '@/components/model-list';
 import { EmptyState, PageHeader } from '@/components/ui';
 import { api } from '@/lib/api';
-import { CATEGORY_LABEL, ORG_TYPE_LABEL } from '@/lib/format';
+import { getLabels } from '@/lib/meta';
 import { readString, type SearchParams } from '@/lib/query';
 
 export const metadata: Metadata = { title: 'Search' };
@@ -18,7 +18,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       </>
     );
   }
-  const r = await api.search(q, 10);
+  const [r, labels] = await Promise.all([api.search(q, 10), getLabels()]);
 
   return (
     <>
@@ -46,9 +46,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           )}
           <div className="grid gap-6 md:grid-cols-3">
             {[
-              { title: 'AI labs', items: r.organizations.map((o) => ({ href: `/labs/${o.slug}`, name: o.name, meta: ORG_TYPE_LABEL[o.type] })) },
+              { title: 'AI labs', items: r.organizations.map((o) => ({ href: `/labs/${o.slug}`, name: o.name, meta: labels.organizationType[o.type] })) },
               { title: 'Providers', items: r.providers.map((p) => ({ href: `/providers/${p.slug}`, name: p.name, meta: '' })) },
-              { title: 'Benchmarks', items: r.benchmarks.map((b) => ({ href: `/rankings?benchmark=${b.slug}`, name: b.name, meta: CATEGORY_LABEL[b.category] })) },
+              { title: 'Benchmarks', items: r.benchmarks.map((b) => ({ href: `/rankings?benchmark=${b.slug}`, name: b.name, meta: labels.benchmarkCategory[b.category] })) },
             ]
               .filter((g) => g.items.length)
               .map((g) => (
