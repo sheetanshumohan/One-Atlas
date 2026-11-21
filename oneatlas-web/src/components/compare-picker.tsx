@@ -13,11 +13,11 @@ export function ComparePicker({ selected, options }: { selected: { slug: string;
   const available = options.filter((o) => !slugs.includes(o.slug));
 
   return (
-    <div className="card flex flex-wrap items-center gap-2 p-4" data-testid="compare-picker">
+    <div className="card flex animate-fade-up flex-wrap items-center gap-2 p-4" data-testid="compare-picker">
       {selected.map((s) => (
-        <span key={s.slug} className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-sm text-brand-700 dark:bg-slate-800 dark:text-brand-100">
+        <span key={s.slug} className="inline-flex items-center gap-1.5 rounded-full bg-brand-500/15 px-3 py-1.5 text-sm text-brand-300 ring-1 ring-inset ring-brand-400/25">
           {s.name}
-          <button type="button" aria-label={`Remove ${s.name}`} className="font-bold hover:text-red-600" onClick={() => go(slugs.filter((x) => x !== s.slug))}>
+          <button type="button" aria-label={`Remove ${s.name}`} className="font-bold text-brand-300/70 transition hover:text-rose-300" onClick={() => go(slugs.filter((x) => x !== s.slug))}>
             ×
           </button>
         </span>
@@ -33,7 +33,7 @@ export function ComparePicker({ selected, options }: { selected: { slug: string;
         <label htmlFor="add-model" className="sr-only">
           Add a model
         </label>
-        <select id="add-model" className="input !w-60" value={choice} onChange={(e) => setChoice(e.target.value)} disabled={slugs.length >= MAX_COMPARE}>
+        <select id="add-model" className="input !w-64" value={choice} onChange={(e) => setChoice(e.target.value)} disabled={slugs.length >= MAX_COMPARE}>
           <option value="">{slugs.length >= MAX_COMPARE ? 'Maximum 6 models' : 'Add a model…'}</option>
           {available.map((o) => (
             <option key={o.slug} value={o.slug}>

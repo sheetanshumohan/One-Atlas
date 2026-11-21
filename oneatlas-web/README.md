@@ -16,6 +16,23 @@ Next.js 15 (App Router) · React 19 · TypeScript (strict) · Tailwind CSS 3. Al
 | `/providers`, `/providers/[slug]` | Provider directory → every model served, with that provider's prices |
 | `/search?q=` | Global search across models, labs, providers and benchmarks |
 
+## Design
+
+A dark, modern interface: glass cards, gradient accents, the Geist typeface, and gentle motion.
+
+- **Design tokens** live in `tailwind.config.ts` (colours, animations) and `src/app/globals.css` (component classes
+  such as `.card`, `.btn-primary`, `.input`, `.text-gradient`).
+- **Motion:** pages and lists fade up in sequence, score bars grow in, cards lift on hover, and the background glows
+  drift slowly. Everything is switched off for users who set "reduce motion" in their system.
+- **Lab and provider avatars** are gradient monograms whose colour comes from the name, so a lab looks the same on
+  every page (no external logo files).
+- **Performance:**
+  - The background glows are radial gradients, not `filter: blur()`. Blur filters are re-drawn every frame and made
+    the site measurably slower; gradients are drawn once and only moved.
+  - Cards use no `backdrop-filter`, so dozens of cards aren't re-blurring the moving background each frame.
+- **Layout:** the model table switches to cards on smaller screens. Long names wrap instead of widening the table, and
+  low-priority columns hide on narrow screens. Checked by measuring overflow at 768 / 1024 / 1280 / 1440 / 1920 px.
+
 ## Architecture and decisions
 
 - **Server Components fetch from the API** (`src/lib/api.ts`). The browser never calls the API directly, so:

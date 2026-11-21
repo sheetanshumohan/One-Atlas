@@ -13,7 +13,7 @@ export function CompareButton({ slug, name, size = 'sm' }: { slug: string; name:
       disabled={disabled}
       aria-pressed={active}
       title={disabled ? 'You can compare up to 6 models' : active ? 'Remove from comparison' : 'Add to comparison'}
-      className={`${active ? 'btn-primary' : 'btn-secondary'} ${size === 'sm' ? '!px-2 !py-1 text-xs' : ''}`}
+      className={`${active ? 'btn-primary' : 'btn-secondary'} ${size === 'sm' ? '!rounded-lg !px-2.5 !py-1 text-xs' : ''}`}
       data-testid={`compare-${slug}`}
     >
       {active ? '✓ Comparing' : '+ Compare'}

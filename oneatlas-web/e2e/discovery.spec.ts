@@ -88,7 +88,11 @@ test.describe('Model discovery & search', () => {
   });
 
   test.describe('without JavaScript (also covers clicks before hydration)', () => {
-    test.use({ javaScriptEnabled: false });
+    // reducedMotion: with page JavaScript disabled, Playwright cannot confirm that an element in the middle
+    // of a CSS entrance animation has settled (its stability check relies on animation-frame callbacks), so
+    // a click during the animation waits forever. Real users are unaffected. Reduced motion (which the site
+    // honours) removes the animations, and also exercises that accessibility path.
+    test.use({ javaScriptEnabled: false, reducedMotion: 'reduce' });
 
     test('pages are fully server-rendered with data', async ({ page }) => {
       await page.goto('/models/gpt-4o');

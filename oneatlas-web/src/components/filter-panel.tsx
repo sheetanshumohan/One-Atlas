@@ -42,14 +42,14 @@ export function FilterPanel({ options }: { options: FilterOptions }) {
       .map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />);
 
   const checkboxGroup = (key: string, title: string, items: { value: string; label: string; count?: number }[]) => (
-    <fieldset className="border-t border-slate-200 py-3 dark:border-slate-800">
-      <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</legend>
-      <div className="max-h-48 space-y-1 overflow-y-auto pr-1">
+    <fieldset className="border-t border-white/[0.06] py-4">
+      <legend className="eyebrow mb-2.5">{title}</legend>
+      <div className="max-h-52 space-y-0.5 overflow-y-auto pr-1">
         {items.map((it) => (
-          <label key={it.value} className="flex cursor-pointer items-center gap-2 text-sm">
-            <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={list(key).includes(it.value)} onChange={() => apply({ [key]: toggle(list(key), it.value) })} />
+          <label key={it.value} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-1.5 py-1 text-sm text-slate-300 transition hover:bg-white/[0.04] hover:text-white">
+            <input type="checkbox" className="checkbox" checked={list(key).includes(it.value)} onChange={() => apply({ [key]: toggle(list(key), it.value) })} />
             <span className="flex-1 truncate">{it.label}</span>
-            {it.count !== undefined && <span className="text-xs text-slate-400">{it.count}</span>}
+            {it.count !== undefined && <span className="rounded-md bg-white/[0.05] px-1.5 text-[11px] tabular-nums text-slate-500">{it.count}</span>}
           </label>
         ))}
       </div>
@@ -57,7 +57,7 @@ export function FilterPanel({ options }: { options: FilterOptions }) {
   );
 
   return (
-    <aside aria-label="Filters" className={pending ? 'opacity-60 transition-opacity' : ''} data-testid="filter-panel">
+    <aside aria-label="Filters" className={`transition-opacity ${pending ? 'opacity-50' : ''}`} data-testid="filter-panel">
       <form
         action={url.pathname}
         method="get"
@@ -65,10 +65,10 @@ export function FilterPanel({ options }: { options: FilterOptions }) {
           e.preventDefault();
           apply({ q: q.trim() || [] });
         }}
-        className="pb-3"
+        className="pb-4"
       >
         {keepOtherParams('q')}
-        <label htmlFor="model-q" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <label htmlFor="model-q" className="eyebrow mb-2 block">
           Search
         </label>
         <div className="flex gap-2">
@@ -85,17 +85,17 @@ export function FilterPanel({ options }: { options: FilterOptions }) {
       {checkboxGroup('capability', 'Capabilities (all of)', options.capabilities.map((o) => ({ value: o.slug, label: o.name, count: o.count })))}
       {checkboxGroup('inputModality', 'Input modalities (all of)', MODALITIES.map((m) => ({ value: m, label: m[0] + m.slice(1).toLowerCase() })))}
 
-      <div className="space-y-3 border-t border-slate-200 py-3 dark:border-slate-800">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={url.get('openWeights') === 'true'} onChange={(e) => apply({ openWeights: e.target.checked ? 'true' : [] })} />
+      <div className="space-y-4 border-t border-white/[0.06] py-4">
+        <label className="flex cursor-pointer items-center gap-2.5 text-sm text-slate-300">
+          <input type="checkbox" className="checkbox" checked={url.get('openWeights') === 'true'} onChange={(e) => apply({ openWeights: e.target.checked ? 'true' : [] })} />
           Open weights only
         </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={url.get('status') === 'PREVIEW,ACTIVE'} onChange={(e) => apply({ status: e.target.checked ? 'PREVIEW,ACTIVE' : [] })} />
+        <label className="flex cursor-pointer items-center gap-2.5 text-sm text-slate-300">
+          <input type="checkbox" className="checkbox" checked={url.get('status') === 'PREVIEW,ACTIVE'} onChange={(e) => apply({ status: e.target.checked ? 'PREVIEW,ACTIVE' : [] })} />
           Hide deprecated
         </label>
         <div>
-          <label htmlFor="minContext" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <label htmlFor="minContext" className="eyebrow mb-2 block">
             Context window
           </label>
           <select id="minContext" className="input" value={url.get('minContext') ?? ''} onChange={(e) => apply({ minContext: e.target.value || [] })}>
@@ -116,7 +116,7 @@ export function FilterPanel({ options }: { options: FilterOptions }) {
           }}
         >
           {keepOtherParams('maxInputPrice')}
-          <label htmlFor="maxInputPrice" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <label htmlFor="maxInputPrice" className="eyebrow mb-2 block">
             Max input price ($/1M)
           </label>
           <div className="flex gap-2">

@@ -52,7 +52,7 @@ export default async function ModelsPage({ searchParams }: { searchParams: Promi
         <EmptyState title="No models match these filters">Try removing a filter or widening the price / context range.</EmptyState>
       ) : (
         <>
-          <ModelList models={result.data} />
+          <ModelList models={result.data} tableFrom="xl" />
           <Pagination page={result.meta.page} totalPages={result.meta.totalPages} hrefFor={(p) => `/models${withParams(sp, { page: p === 1 ? [] : String(p) })}`} />
         </>
       );
@@ -69,17 +69,20 @@ export default async function ModelsPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHeader title="Models" description="Browse, search and filter AI models by lab, provider, capability and type. Prices are the cheapest available, in USD per 1M tokens.">
+      <PageHeader eyebrow="Model explorer" title="Models" description="Browse, search and filter AI models by lab, provider, capability and type. Prices are the cheapest available, in USD per 1M tokens.">
           <SortSelect />
       </PageHeader>
-      <div className="grid items-start gap-6 lg:grid-cols-[260px_1fr]">
+      <div className="grid items-start gap-6 lg:grid-cols-[280px_1fr]">
         <FiltersShell>
             <FilterPanel options={options} />
         </FiltersShell>
         <div className="min-w-0">
-          <p className="mb-3 text-sm text-slate-600 dark:text-slate-400" data-testid="result-count">
-            {total} {total === 1 ? 'model' : 'models'}
-          </p>
+          <div className="mb-4 flex items-center gap-2 text-sm text-slate-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-brand-400 shadow-[0_0_8px_2px_rgba(129,140,248,0.6)]" aria-hidden />
+            <span data-testid="result-count">
+              {total} {total === 1 ? 'model' : 'models'}
+            </span>
+          </div>
           {content}
         </div>
       </div>

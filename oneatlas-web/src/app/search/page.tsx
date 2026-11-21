@@ -22,7 +22,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHeader title={`Results for “${q}”`} description={`${r.total} matches across models, labs, providers and benchmarks.`} />
+      <PageHeader eyebrow="Search" title={`Results for “${q}”`} description={`${r.total} matches across models, labs, providers and benchmarks.`} />
       {r.total === 0 ? (
         <EmptyState title="Nothing found">
           Try a shorter query, or{' '}
@@ -35,8 +35,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         <div className="space-y-8">
           {r.models.length > 0 && (
             <section data-testid="search-models">
-              <div className="mb-2 flex items-baseline justify-between">
-                <h2 className="font-semibold">Models</h2>
+              <div className="mb-4 flex items-baseline justify-between">
+                <h2 className="text-xl font-semibold">Models</h2>
                 <Link href={`/models?q=${encodeURIComponent(q)}`} className="link text-sm">
                   See all in model explorer →
                 </Link>
@@ -52,15 +52,15 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
             ]
               .filter((g) => g.items.length)
               .map((g) => (
-                <section key={g.title} className="card p-4">
-                  <h2 className="mb-2 font-semibold">{g.title}</h2>
+                <section key={g.title} className="card animate-fade-up p-5">
+                  <h2 className="eyebrow mb-3">{g.title}</h2>
                   <ul className="space-y-1">
                     {g.items.map((it) => (
-                      <li key={it.href} className="flex justify-between gap-2 text-sm">
-                        <Link href={it.href} className="hover:text-brand-600">
+                      <li key={it.href}>
+                        <Link href={it.href} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-200 transition hover:bg-white/[0.05] hover:text-white">
                           {it.name}
+                          <span className="text-xs text-slate-500">{it.meta}</span>
                         </Link>
-                        <span className="text-xs text-slate-500">{it.meta}</span>
                       </li>
                     ))}
                   </ul>
