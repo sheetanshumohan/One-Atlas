@@ -1,0 +1,61 @@
+{
+  "name": "oneatlas-api",
+  "version": "1.0.0",
+  "description": "OneAtlas — AI model discovery & intelligence platform (backend API: NestJS + Prisma + PostgreSQL)",
+  "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "start:prod": "prisma migrate deploy && node dist/main.js",
+    "start:demo": "prisma migrate deploy && node dist/cli/seed.js && node dist/main.js",
+    "dev": "node --watch -r ts-node/register/transpile-only src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:seed": "tsx src/cli/seed.ts",
+    "db:seed:prod": "node dist/cli/seed.js",
+    "db:reset": "prisma migrate reset --force",
+    "ingest": "node -r ts-node/register src/cli/ingest.ts",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "jest --selectProjects unit",
+    "test:e2e": "jest --selectProjects e2e --runInBand",
+    "test:cov": "jest --runInBand --coverage",
+    "ingest:prod": "node dist/cli/ingest.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@nestjs/common": "^11.2.11",
+    "@nestjs/core": "^11.2.11",
+    "@nestjs/platform-express": "^11.2.11",
+    "@nestjs/swagger": "^11.4.8",
+    "@nestjs/throttler": "^6.8.0",
+    "@prisma/client": "^6.19.3",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "compression": "^1.8.2",
+    "helmet": "^8.3.0",
+    "prisma": "^6.19.3",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^11.2.11",
+    "@types/compression": "^1.8.1",
+    "@types/express": "^5.0.6",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.20.5",
+    "@types/supertest": "^7.2.1",
+    "jest": "^29.7.0",
+    "supertest": "^7.3.2",
+    "ts-jest": "^29.4.15",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.23.15",
+    "typescript": "5.9"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "prisma": {
+    "seed": "tsx src/cli/seed.ts"
+  }
+}

@@ -1,0 +1,40 @@
+# Render Blueprint for the full OneAtlas product: PostgreSQL + API + web app.
+# Render → New → Blueprint → pick this repo (render.yaml at the repository root is picked up automatically).
+services:
+  - type: web
+    name: oneatlas-api
+    runtime: node
+    rootDir: oneatlas-api
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    # migrate (idempotent) → seed demo catalogue (idempotent upsert) → start
+    startCommand: npm run start:demo
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: oneatlas-db
+          property: connectionString
+      - key: ADMIN_API_KEY
+        generateValue: true
+      - key: TRUSTED_CLIENT_KEY
+        sync: false # set the same random value (≥16 chars) here and in the web service's API_CLIENT_KEY
+
+  - type: web
+    name: oneatlas-web
+    runtime: node
+    rootDir: oneatlas-web
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: API_URL
+        sync: false # the API service's URL, e.g. https://oneatlas-api.onrender.com
+      - key: API_CLIENT_KEY
+        sync: false
+
+databases:
+  - name: oneatlas-db
+    plan: free

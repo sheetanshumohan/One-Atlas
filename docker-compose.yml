@@ -1,0 +1,35 @@
+# Full OneAtlas stack locally:  docker compose up --build   →  web http://localhost:3001 · API docs http://localhost:3000/docs
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: oneatlas
+    ports: ['5432:5432']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 3s
+      retries: 20
+
+  api:
+    build: ./oneatlas-api
+    # migrate → idempotent seed → start
+    command: ['npm', 'run', 'start:demo']
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/oneatlas?schema=public
+      ADMIN_API_KEY: local-admin-key-change-me-0123456789
+      TRUSTED_CLIENT_KEY: local-web-client-key-0123456789
+      NODE_ENV: production
+    ports: ['3000:3000']
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./oneatlas-web
+    environment:
+      API_URL: http://api:3000
+      API_CLIENT_KEY: local-web-client-key-0123456789
+    ports: ['3001:3001']
+    depends_on: [api]

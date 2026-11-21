@@ -1,0 +1,94 @@
+name: OneAtlas CI
+
+on:
+  push:
+    paths: ['oneatlas-api/**', 'oneatlas-web/**', '.github/workflows/oneatlas-ci.yml']
+  pull_request:
+    paths: ['oneatlas-api/**', 'oneatlas-web/**', '.github/workflows/oneatlas-ci.yml']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: oneatlas-api
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: oneatlas_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/oneatlas_test?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: oneatlas-api/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Verify migrations match schema (no drift)
+        # Uses a dedicated throwaway shadow DB: prisma leaves the shadow DB populated, which would
+        # make the later `migrate deploy` on the test DB fail with P3005.
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -c 'CREATE DATABASE oneatlas_shadow;'
+          npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "postgresql://postgres:postgres@localhost:5432/oneatlas_shadow" --exit-code
+      - run: npm run test:unit
+      - run: npm run test:e2e
+
+  web:
+    # Full-stack check: real PostgreSQL + API + Next.js app, driven by Playwright (desktop + mobile).
+    needs: test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: oneatlas
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/oneatlas?schema=public
+      TRUSTED_CLIENT_KEY: ci-web-client-key-0123456789
+      API_CLIENT_KEY: ci-web-client-key-0123456789
+      API_URL: http://localhost:3000
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Start API (migrate + seed)
+        working-directory: oneatlas-api
+        run: |
+          npm ci && npm run build
+          nohup npm run start:demo > api.log 2>&1 &
+          npx --yes wait-on -t 60000 http://localhost:3000/api/v1/health
+      - name: Build, unit-test and start web
+        working-directory: oneatlas-web
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+          nohup npm start > web.log 2>&1 &
+          npx --yes wait-on -t 60000 http://localhost:3001
+      - name: Browser tests (Playwright)
+        working-directory: oneatlas-web
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
