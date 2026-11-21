@@ -81,7 +81,8 @@ for (const [sort, fn] of Object.entries(value)) {
     const firstNull = vals.indexOf(null);
     check(`${sort}/${order}: unknown values last`, firstNull === -1 || vals.slice(firstNull).every((v) => v === null));
     const known = vals.filter((v) => v !== null);
-    const cmp = (a, b) => (typeof a === 'string' ? a.localeCompare(b) : a - b);
+    // Names: the API guarantees case-insensitive code-point order (COLLATE "C"), identical on every server.
+    const cmp = (a, b) => (typeof a === 'string' ? (a < b ? -1 : a > b ? 1 : 0) : a - b);
     check(`${sort}/${order}: sorted`, known.every((v, i) => i === 0 || (order === 'asc' ? cmp(known[i - 1], v) <= 0 : cmp(known[i - 1], v) >= 0)));
   }
 }

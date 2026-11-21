@@ -130,6 +130,23 @@ describe('Models — write API, pricing & benchmark data management (e2e)', () =
       const res = await http().get('/api/v1/models?sort=name&pageSize=1').expect(200);
       expect(res.body.data[0].slug).toBe('beta-old');
     });
+
+    it('orders by code point regardless of the server collation (spaces/punctuation are significant)', async () => {
+      // Language collations such as glibc en_US ignore spaces and punctuation at the first level and would
+      // tie these three names; the API guarantees the same order on every server (column COLLATE "C").
+      for (const [slug, name] of [['zz-c', 'zz.c'], ['zz-b', 'zz-c'], ['zz-a', 'zz c']]) {
+        await http().post('/api/v1/models').set(auth).send(newModel({ slug, name, capabilities: [] })).expect(201);
+      }
+      const res = await http().get('/api/v1/models?sort=name&q=zz').expect(200);
+      expect(res.body.data.map((m: { name: string }) => m.name)).toEqual(['zz c', 'zz-c', 'zz.c']);
+      const col = await t.prisma.$queryRaw<{ table_name: string; collation_name: string }[]>`
+        SELECT table_name, collation_name FROM information_schema.columns WHERE column_name = 'nameSortKey' ORDER BY table_name`;
+      expect(col).toEqual([
+        { table_name: 'Model', collation_name: 'C' },
+        { table_name: 'Organization', collation_name: 'C' },
+        { table_name: 'Provider', collation_name: 'C' },
+      ]);
+    });
   });
 
   describe('PATCH /models/:slug', () => {
