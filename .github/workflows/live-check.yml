@@ -1,0 +1,45 @@
+name: Live deployment check
+
+# Verifies the DEPLOYED product from outside: read-only black-box checks against the live API,
+# and the full Playwright suite (desktop + mobile) against the live website.
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: Live API base URL
+        default: https://oneatlas-api.onrender.com
+      web_url:
+        description: Live website URL (leave empty to skip the browser tests)
+        default: ''
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Black-box checks against the live API
+        run: node scripts/live-check.mjs
+        env:
+          API_URL: ${{ inputs.api_url }}
+
+  web:
+    if: ${{ inputs.web_url != '' }}
+    needs: api
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: oneatlas-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Browser tests against the live website
+        run: npm run test:e2e
+        env:
+          WEB_URL: ${{ inputs.web_url }}
