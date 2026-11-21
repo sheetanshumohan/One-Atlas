@@ -6,7 +6,12 @@ export const test = base.extend<{ consoleErrors: string[] }>({
     async ({ page }, use) => {
       const errors: string[] = [];
       page.on('console', (m) => {
-        if (m.type() === 'error' && !/404 \(Not Found\)/.test(m.text())) errors.push(m.text());
+        if (m.type() !== 'error') return;
+        // A page that is *meant* to 404 (the not-found tests) makes the browser log its own document's 404.
+        // Allow only that: a 404 for any other resource (a missing JS chunk, image, …) still fails the test.
+        // Match the status code, not the reason phrase — HTTP/2 hosts such as Vercel send none ("404 ()").
+        const isOwnDocument404 = /status of 404\b/.test(m.text()) && m.location().url === page.url();
+        if (!isOwnDocument404) errors.push(m.text());
       });
       page.on('pageerror', (e) => errors.push(String(e)));
       await use(errors);
